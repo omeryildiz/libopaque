@@ -113,9 +113,9 @@ typedef struct {
 } __attribute((packed)) Opaque_Keys;
 
 // sodium defines an hmac with 32B as key, opaque as 64
-static void opaque_hmacsha512(const uint8_t key[OPAQUE_HMAC_SHA512_KEYBYTES],
+static void opaque_hmacsha512(const uint8_t *key,
                               const uint8_t *authenticated, const size_t auth_len,
-                              uint8_t mac[OPAQUE_HMAC_SHA512_BYTES]) {
+                              uint8_t *mac) {
   crypto_auth_hmacsha512_state st;
   crypto_auth_hmacsha512_init(&st, key, OPAQUE_HMAC_SHA512_KEYBYTES);
   crypto_auth_hmacsha512_update(&st, authenticated, auth_len);
@@ -176,7 +176,7 @@ static int deriveKeyPair(const uint8_t *seed, const size_t seed_len, uint8_t skS
 
 static int finalize(const uint8_t *x, const uint16_t x_len,
                          const uint8_t N[crypto_core_ristretto255_BYTES],
-                         uint8_t rwdU[OPRF_BYTES]) {
+                         uint8_t *rwdU) {
 
   // - concat(y, Harden(y, params))
   uint8_t concated[2*crypto_hash_sha512_BYTES];
@@ -223,7 +223,7 @@ static int finalize(const uint8_t *x, const uint16_t x_len,
 
 static int prf(const uint8_t *pwdU, const uint16_t pwdU_len,
                const uint8_t kU[crypto_core_ristretto255_SCALARBYTES],
-               uint8_t rwdU[OPAQUE_RWDU_BYTES]) {
+               uint8_t *rwdU) {
   // F_k(pwd) = H(pwd, (H0(pwd))^k) for key k ∈ Z_q
   uint8_t H0[crypto_core_ristretto255_BYTES];
   if(0!=sodium_mlock(H0,sizeof H0)) {
@@ -369,7 +369,7 @@ static void calc_preamble(char preamble[crypto_hash_sha512_BYTES],
                           crypto_hash_sha512_state *state,
                           const uint8_t pkU[crypto_scalarmult_BYTES],
                           const uint8_t pkS[crypto_scalarmult_BYTES],
-                          const uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN],
+                          const uint8_t *ke1,
                           const Opaque_ServerSession *ke2,
                           const uint8_t *ctx, const uint16_t ctx_len,
                           const Opaque_Ids *ids0) {
@@ -514,7 +514,7 @@ static int user_3dh(Opaque_Keys *keys,
   return 0;
 }
 
-static int skU_from_rwd(const uint8_t rwd[OPAQUE_RWDU_BYTES], const uint8_t nonce[OPAQUE_NONCE_BYTES], uint8_t skU[crypto_scalarmult_BYTES]) {
+static int skU_from_rwd(const uint8_t *rwd, const uint8_t *nonce, uint8_t skU[crypto_scalarmult_BYTES]) {
   char info[OPAQUE_NONCE_BYTES+10];
   memcpy(info, nonce, OPAQUE_NONCE_BYTES);
   memcpy(info+OPAQUE_NONCE_BYTES, "PrivateKey", 10);
@@ -534,7 +534,7 @@ static int skU_from_rwd(const uint8_t rwd[OPAQUE_RWDU_BYTES], const uint8_t nonc
   return 0;
 }
 
-static int create_envelope(const uint8_t rwdU[OPAQUE_RWDU_BYTES],
+static int create_envelope(const uint8_t *rwdU,
                            const uint8_t server_public_key[crypto_scalarmult_BYTES],
                            const Opaque_Ids *ids,
                            Opaque_Envelope *env,
@@ -685,7 +685,7 @@ int opaque_Register_core(const uint8_t *pwdU, const uint16_t pwdU_len,
                          const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                          const Opaque_Ids *ids,
                          const uint8_t *unlink_masking_key, const size_t umk_len,
-                         uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+                         uint8_t *_rec,
                          uint8_t export_key[crypto_hash_sha512_BYTES]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
 
@@ -753,12 +753,12 @@ int opaque_Register_core(const uint8_t *pwdU, const uint16_t pwdU_len,
 int opaque_Register(const uint8_t *pwdU, const uint16_t pwdU_len,
                     const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                     const Opaque_Ids *ids,
-                    uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+                    uint8_t *_rec,
                     uint8_t export_key[crypto_hash_sha512_BYTES]) {
   return opaque_Register_core(pwdU, pwdU_len, skS, ids, NULL, 0, _rec, export_key);
 }
 
-int opaque_CreateCredentialRequest_oprf(const uint8_t *pwdU, const uint16_t pwdU_len, uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len], uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
+int opaque_CreateCredentialRequest_oprf(const uint8_t *pwdU, const uint16_t pwdU_len, uint8_t *_sec, uint8_t *ke1) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) ke1;
 #ifdef TRACE
@@ -785,7 +785,7 @@ int opaque_CreateCredentialRequest_oprf(const uint8_t *pwdU, const uint16_t pwdU
   return 0;
 }
 
-int opaque_CreateCredentialRequest_ake(const uint16_t pwdU_len, uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len], uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
+int opaque_CreateCredentialRequest_ake(const uint16_t pwdU_len, uint8_t *_sec, uint8_t *ke1) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) ke1;
 
@@ -820,7 +820,7 @@ int opaque_CreateCredentialRequest_ake(const uint16_t pwdU_len, uint8_t _sec[OPA
 //(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
 //X_u := g^x_u ; sends α and X_u to S.
 // more or less corresponds to CreateCredentialRequest in the irtf draft
-int opaque_CreateCredentialRequest(const uint8_t *pwdU, const uint16_t pwdU_len, uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len], uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
+int opaque_CreateCredentialRequest(const uint8_t *pwdU, const uint16_t pwdU_len, uint8_t *_sec, uint8_t *ke1) {
   if(0!=opaque_CreateCredentialRequest_oprf(pwdU, pwdU_len, _sec, ke1)) return -1;
   return opaque_CreateCredentialRequest_ake(pwdU_len, _sec, ke1);
 }
@@ -833,16 +833,16 @@ int opaque_CreateCredentialRequest(const uint8_t *pwdU, const uint16_t pwdU_len,
 // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f K (0);
 // (e) Sends β, X s and c to U;
 // (f) Outputs (sid , ssid , SK).
-int opaque_CreateCredentialResponse_core(const uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN],
-                                         const uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+int opaque_CreateCredentialResponse_core(const uint8_t *ke1,
+                                         const uint8_t *_rec,
                                          const Opaque_Ids *ids,
                                          const uint8_t *ctx,
                                          const uint16_t ctx_len,
-                                         const uint8_t zero[TOPRF_Share_BYTES],
+                                         const uint8_t *zero,
                                          const uint8_t *ssid_S, const uint16_t ssid_S_len,
                                          // output
-                                         uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
-                                         uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                                         uint8_t *ke2,
+                                         uint8_t *sk,
                                          uint8_t authU[crypto_auth_hmacsha512_BYTES]) {
   Opaque_UserSession *pub = (Opaque_UserSession *) ke1;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
@@ -1039,21 +1039,21 @@ int opaque_CreateCredentialResponse_core(const uint8_t ke1[OPAQUE_USER_SESSION_P
 }
 
 
-int opaque_CreateCredentialResponse(const uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN],
-                                    const uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+int opaque_CreateCredentialResponse(const uint8_t *ke1,
+                                    const uint8_t *_rec,
                                     const Opaque_Ids *ids,
                                     const uint8_t *ctx,
                                     const uint16_t ctx_len,
                                     // output
-                                    uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
-                                    uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                                    uint8_t *ke2,
+                                    uint8_t *sk,
                                     uint8_t authU[crypto_auth_hmacsha512_BYTES]) {
   return opaque_CreateCredentialResponse_core(ke1, _rec, ids, ctx, ctx_len, NULL, NULL, 0, ke2, sk, authU);
 }
 
 int opaque_CombineCredentialResponses(const uint8_t t, const uint8_t n,
-                                      const uint8_t indexes[n],
-                                      const uint8_t ke2s[n][OPAQUE_SERVER_SESSION_LEN],
+                                      const uint8_t *indexes,
+                                      const uint8_t *ke2s[OPAQUE_SERVER_SESSION_LEN],
                                       uint8_t beta[crypto_scalarmult_ristretto255_BYTES]) {
   if(n<t) return 1; // not enough shares
   if(t<2) return 1; // not a threshold setup
@@ -1099,13 +1099,13 @@ int opaque_CombineCredentialResponses(const uint8_t t, const uint8_t n,
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_RecoverCredentials_extBeta(const uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
+int opaque_RecoverCredentials_extBeta(const uint8_t *ke2,
                                       const uint8_t *_sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
                                       const uint8_t *ctx, const uint16_t ctx_len,
                                       const Opaque_Ids *ids0,
                                       const uint8_t beta[crypto_scalarmult_ristretto255_BYTES],
                                       const uint8_t *unlink_masking_key, const size_t umk_len,
-                                      uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                                      uint8_t *sk,
                                       uint8_t authU[crypto_auth_hmacsha512_BYTES], // aka ke3
                                       uint8_t export_key[crypto_hash_sha512_BYTES]) {
 
@@ -1395,11 +1395,11 @@ int opaque_RecoverCredentials_extBeta(const uint8_t ke2[OPAQUE_SERVER_SESSION_LE
   return 0;
 }
 
-int opaque_RecoverCredentials(const uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
+int opaque_RecoverCredentials(const uint8_t *ke2,
                               const uint8_t *_sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
                               const uint8_t *ctx, const uint16_t ctx_len,
                               const Opaque_Ids *ids0,
-                              uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                              uint8_t *sk,
                               uint8_t authU[crypto_auth_hmacsha512_BYTES], // aka ke3
                               uint8_t export_key[crypto_hash_sha512_BYTES]) {
   return opaque_RecoverCredentials_extBeta(ke2, _sec, ctx, ctx_len, ids0, NULL, NULL, 0, sk, authU, export_key);
@@ -1414,7 +1414,7 @@ int opaque_UserAuth(const uint8_t authU0[crypto_auth_hmacsha512_BYTES], const ui
 
 // U computes: blinded PW
 // called CreateRegistrationRequest in the irtf cfrg rfc draft
-int opaque_CreateRegistrationRequest(const uint8_t *pwdU, const uint16_t pwdU_len, uint8_t _sec[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len], uint8_t blinded[crypto_core_ristretto255_BYTES]) {
+int opaque_CreateRegistrationRequest(const uint8_t *pwdU, const uint16_t pwdU_len, uint8_t *_sec, uint8_t blinded[crypto_core_ristretto255_BYTES]) {
   Opaque_RegisterUserSec *sec = (Opaque_RegisterUserSec *) _sec;
   memcpy(&sec->pwdU, pwdU, pwdU_len);
   sec->pwdU_len = pwdU_len;
@@ -1432,10 +1432,10 @@ int opaque_CreateRegistrationResponse_core(const uint8_t blinded[crypto_core_ris
                                            const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                                            const toprf_keygencb keygen,
                                            void* keygen_ctx,
-                                           const uint8_t zero[TOPRF_Share_BYTES],
+                                           const uint8_t *zero,
                                            const uint8_t *ssid_S, const uint16_t ssid_S_len,
-                                           uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN],
-                                           uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
+                                           uint8_t *_sec,
+                                           uint8_t *_pub) {
   Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
   Opaque_RegisterSrvPub *pub = (Opaque_RegisterSrvPub *) _pub;
 
@@ -1508,20 +1508,20 @@ int opaque_CreateRegistrationResponse_extKeygen(const uint8_t blinded[crypto_cor
                                                 const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                                                 const toprf_keygencb keygen,
                                                 void* keygen_ctx,
-                                                uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN],
-                                                uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
+                                                uint8_t *_sec,
+                                                uint8_t *_pub) {
   return opaque_CreateRegistrationResponse_core(blinded, skS, keygen, keygen_ctx, NULL, NULL, 0, _sec, _pub);
 }
 
 int opaque_CreateRegistrationResponse(const uint8_t blinded[crypto_core_ristretto255_BYTES],
                                       const uint8_t skS[crypto_scalarmult_SCALARBYTES],
-                                      uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN],
-                                      uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
+                                      uint8_t *_sec,
+                                      uint8_t *_pub) {
   return opaque_CreateRegistrationResponse_core(blinded, skS, NULL, NULL, NULL, NULL, 0, _sec, _pub);
 }
 
 int opaque_CombineRegistrationResponses(const uint8_t t, const uint8_t n,
-                                        const uint8_t _pubs[n][OPAQUE_REGISTER_PUBLIC_LEN]) {
+                                        const uint8_t *_pubs[OPAQUE_REGISTER_PUBLIC_LEN]) {
   if(n<t) return 1; // not enough shares
   if(t<2) return 1; // not a threshold setup
 #ifdef TRACE
@@ -1569,10 +1569,10 @@ int opaque_CombineRegistrationResponses(const uint8_t t, const uint8_t n,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
 // called FinalizeRequest in the irtf cfrg rfc draft
 int opaque_FinalizeRequest_core(const uint8_t *_sec/*[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len]*/,
-                                const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN],
+                                const uint8_t *_pub,
                                 const Opaque_Ids *ids,
                                 const uint8_t *unlink_masking_key, const size_t umk_len,
-                                uint8_t _rec[OPAQUE_REGISTRATION_RECORD_LEN],
+                                uint8_t *_rec,
                                 uint8_t export_key[crypto_hash_sha512_BYTES]) {
 
   Opaque_RegisterUserSec *sec = (Opaque_RegisterUserSec *) _sec;
@@ -1584,7 +1584,7 @@ int opaque_FinalizeRequest_core(const uint8_t *_sec/*[OPAQUE_REGISTER_USER_SEC_L
   // 1. N = Unblind(blind, response.data)
   if(0!=oprf_Unblind(sec->blind, pub->Z, N)) {
     sodium_munlock(N, sizeof N);
-    return -1;
+    return -2;
   }
 #if (defined TRACE || defined CFRG_TEST_VEC)
   dump(N, sizeof N, "unblinded");
@@ -1593,19 +1593,19 @@ int opaque_FinalizeRequest_core(const uint8_t *_sec/*[OPAQUE_REGISTER_USER_SEC_L
   uint8_t rwdU[OPAQUE_RWDU_BYTES];
   if(-1==sodium_mlock(rwdU, sizeof rwdU)) {
     sodium_munlock(N, sizeof N);
-    return -1;
+    return -3;
   }
   // 2. y = Finalize(pwdU, N, "OPAQUE01")
   if(0!=finalize(sec->pwdU, sec->pwdU_len, N, rwdU)) {
     sodium_munlock(N, sizeof N);
     sodium_munlock(rwdU, sizeof(rwdU));
-    return -1;
+    return -4;
   }
   sodium_munlock(N,sizeof N);
 
   if(0!=create_envelope(rwdU, pub->pkS, ids, &rec->envelope, rec->client_public_key, rec->masking_key, export_key)) {
     sodium_munlock(rwdU, sizeof rwdU);
-    return -1;
+    return -5;
   }
   sodium_munlock(rwdU, sizeof rwdU);
   if(unlink_masking_key!=NULL) personalize_masking_key(unlink_masking_key, umk_len, rec->masking_key);
@@ -1622,16 +1622,16 @@ int opaque_FinalizeRequest_core(const uint8_t *_sec/*[OPAQUE_REGISTER_USER_SEC_L
 }
 
 int opaque_FinalizeRequest(const uint8_t *_sec/*[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len]*/,
-                           const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN],
+                           const uint8_t *_pub,
                            const Opaque_Ids *ids,
-                           uint8_t _rec[OPAQUE_REGISTRATION_RECORD_LEN],
+                           uint8_t *_rec,
                            uint8_t export_key[crypto_hash_sha512_BYTES]) {
    return opaque_FinalizeRequest_core(_sec, _pub, ids, NULL, 0, _rec, export_key);
 }
 
 // S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
 // called StoreUserRecord in the irtf cfrg rfc draft
-void opaque_StoreUserRecord(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t recU[OPAQUE_REGISTRATION_RECORD_LEN], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
+void opaque_StoreUserRecord(const uint8_t *_sec, const uint8_t *recU, uint8_t *_rec) {
   Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 

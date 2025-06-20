@@ -110,7 +110,7 @@ typedef struct {
 int opaque_Register(const uint8_t *pwdU, const uint16_t pwdU_len,
                     const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                     const Opaque_Ids *ids,
-                    uint8_t rec[OPAQUE_USER_RECORD_LEN],
+                    uint8_t *rec,
                     uint8_t export_key[crypto_hash_sha512_BYTES]);
 
 /**
@@ -130,10 +130,10 @@ int opaque_CreateCredentialRequest(const uint8_t *pwdU, const uint16_t pwdU_len,
 #ifdef __cplusplus
                                    uint8_t *sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
 #else
-                                   uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len],
+                                   uint8_t *sec,
 #endif
 
-                                   uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+                                   uint8_t *ke1);
 
 /**
    This function implements the OPRF part of the first step of the
@@ -151,9 +151,9 @@ int opaque_CreateCredentialRequest_oprf(const uint8_t *pwdU,
 #ifdef __cplusplus
                                         uint8_t *sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
 #else
-                                        uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len],
+                                        uint8_t *_sec,
 #endif
-                                        uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+                                        uint8_t *ke1);
 /**
    This function implements the AKE part of the first step of the
    OPAQUE protocol, it is used by opaque_CreateCredentialRequest()
@@ -169,9 +169,9 @@ int opaque_CreateCredentialRequest_ake(const uint16_t pwdU_len,
 #ifdef __cplusplus
                                        uint8_t *sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
 #else
-                                       uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len],
+                                       uint8_t *_sec,
 #endif
-                                       uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+                                       uint8_t *ke1);
 
 /**
    This is the same function as defined in the paper with name
@@ -196,12 +196,12 @@ int opaque_CreateCredentialRequest_ake(const uint16_t pwdU_len,
    set to NULL
    @return the function returns 0 if everything is correct
  */
-int opaque_CreateCredentialResponse(const uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN],
-                                    const uint8_t rec[OPAQUE_USER_RECORD_LEN],
+int opaque_CreateCredentialResponse(const uint8_t *ke1,
+                                    const uint8_t *rec,
                                     const Opaque_Ids *ids,
                                     const uint8_t *ctx, const uint16_t ctx_len,
-                                    uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
-                                    uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                                    uint8_t *ke2,
+                                    uint8_t *sk,
                                     uint8_t authU[crypto_auth_hmacsha512_BYTES]);
 
 /**
@@ -218,16 +218,16 @@ int opaque_CreateCredentialResponse(const uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC
           servers agree on.
    @param [in] ssid_S_len: the length of the ssid_S value
  */
-int opaque_CreateCredentialResponse_core(const uint8_t ke1[OPAQUE_USER_SESSION_PUBLIC_LEN],
-                                         const uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+int opaque_CreateCredentialResponse_core(const uint8_t *ke1,
+                                         const uint8_t *_rec,
                                          const Opaque_Ids *ids,
                                          const uint8_t *ctx,
                                          const uint16_t ctx_len,
-                                         const uint8_t zero[TOPRF_Share_BYTES],
+                                         const uint8_t *zero,
                                          const uint8_t *ssid_S, const uint16_t ssid_S_len,
                                          // output
-                                         uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
-                                         uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                                         uint8_t *ke2,
+                                         uint8_t *sk,
                                          uint8_t authU[crypto_auth_hmacsha512_BYTES]);
 
 /**
@@ -252,8 +252,8 @@ int opaque_CreateCredentialResponse_core(const uint8_t ke1[OPAQUE_USER_SESSION_P
    @return 0 on success.
  */
 int opaque_CombineCredentialResponses(const uint8_t t, const uint8_t n,
-                                      const uint8_t indexes[n],
-                                      const uint8_t ke2s[n][OPAQUE_SERVER_SESSION_LEN],
+                                      const uint8_t *indexes,
+                                      const uint8_t *ke2s[OPAQUE_SERVER_SESSION_LEN],
                                       uint8_t beta[crypto_scalarmult_ristretto255_BYTES]);
 
 /**
@@ -281,11 +281,11 @@ int opaque_CombineCredentialResponses(const uint8_t t, const uint8_t n,
    material not stored directly in the envelope
    @return the function returns 0 if the protocol is executed correctly
 */
-int opaque_RecoverCredentials(const uint8_t resp[OPAQUE_SERVER_SESSION_LEN],
+int opaque_RecoverCredentials(const uint8_t *resp,
                               const uint8_t *sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
                               const uint8_t *ctx, const uint16_t ctx_len,
                               const Opaque_Ids *ids,
-                              uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                              uint8_t *sk,
                               uint8_t authU[crypto_auth_hmacsha512_BYTES],
                               uint8_t export_key[crypto_hash_sha512_BYTES]);
 
@@ -308,13 +308,13 @@ int opaque_RecoverCredentials(const uint8_t resp[OPAQUE_SERVER_SESSION_LEN],
    make these records linkable.
    @param [in] umk_len: the length of the array pointed at by unlink_masking_key.
  */
-int opaque_RecoverCredentials_extBeta(const uint8_t ke2[OPAQUE_SERVER_SESSION_LEN],
+int opaque_RecoverCredentials_extBeta(const uint8_t *ke2,
                               const uint8_t *_sec/*[OPAQUE_USER_SESSION_SECRET_LEN+pwdU_len]*/,
                               const uint8_t *ctx, const uint16_t ctx_len,
                               const Opaque_Ids *ids0,
                               const uint8_t beta[crypto_scalarmult_ristretto255_BYTES],
 										const uint8_t *unlink_masking_key, const size_t umk_len,
-                              uint8_t sk[OPAQUE_SHARED_SECRETBYTES],
+                              uint8_t *sk,
                               uint8_t authU[crypto_auth_hmacsha512_BYTES], // aka ke3
                               uint8_t export_key[crypto_hash_sha512_BYTES]);
 
@@ -361,7 +361,7 @@ int opaque_CreateRegistrationRequest(const uint8_t *pwdU,
 #ifdef __cplusplus
                                      uint8_t *sec/*[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len]*/,
 #else
-                                     uint8_t sec[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len],
+                                     uint8_t *sec,
 #endif
                                      uint8_t request[crypto_core_ristretto255_BYTES]);
 
@@ -392,8 +392,8 @@ int opaque_CreateRegistrationRequest(const uint8_t *pwdU,
  */
 int opaque_CreateRegistrationResponse(const uint8_t request[crypto_core_ristretto255_BYTES],
                                       const uint8_t skS[crypto_scalarmult_SCALARBYTES],
-                                      uint8_t sec[OPAQUE_REGISTER_SECRET_LEN],
-                                      uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN]);
+                                      uint8_t *sec,
+                                      uint8_t *pub);
 
 /**
    Same as opaque_CreateRegistrationResponse() - except this takes
@@ -417,8 +417,8 @@ int opaque_CreateRegistrationResponse_extKeygen(const uint8_t blinded[crypto_cor
                                                 const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                                                 const toprf_keygencb keygen,
                                                 void* keygen_ctx,
-                                                uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN],
-                                                uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]);
+                                                uint8_t *_sec,
+                                                uint8_t *_pub);
 
 
 /**
@@ -440,10 +440,10 @@ int opaque_CreateRegistrationResponse_core(const uint8_t blinded[crypto_core_ris
                                            const uint8_t skS[crypto_scalarmult_SCALARBYTES],
                                            const toprf_keygencb keygen,
                                            void* keygen_ctx,
-                                           const uint8_t zero[TOPRF_Share_BYTES],
+                                           const uint8_t *zero,
                                            const uint8_t *ssid_S, const uint16_t ssid_S_len,
-                                           uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN],
-                                           uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]);
+                                           uint8_t *_sec,
+                                           uint8_t *_pub);
 
 /**
    This function combines the shares during a threshold OPAQUE
@@ -465,7 +465,7 @@ int opaque_CreateRegistrationResponse_core(const uint8_t blinded[crypto_core_ris
    @return 0 on success.
  */
 int opaque_CombineRegistrationResponses(const uint8_t t, const uint8_t n,
-                                        const uint8_t _pubs[n][OPAQUE_REGISTER_PUBLIC_LEN]);
+                                        const uint8_t *_pubs[OPAQUE_REGISTER_PUBLIC_LEN]);
 
 /**
    Client finalizes registration by concluding the OPRF, generating
@@ -499,10 +499,10 @@ int opaque_CombineRegistrationResponses(const uint8_t t, const uint8_t n,
    @return the function returns 0 if everything is correct.
  */
 int opaque_FinalizeRequest_core(const uint8_t *sec/*[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len]*/,
-                                const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN],
+                                const uint8_t *pub,
                                 const Opaque_Ids *ids,
                                 const uint8_t *unlink_masking_key, const size_t umk_len,
-                                uint8_t reg_rec[OPAQUE_REGISTRATION_RECORD_LEN],
+                                uint8_t *reg_rec,
                                 uint8_t export_key[crypto_hash_sha512_BYTES]);
 
 /**
@@ -517,9 +517,9 @@ int opaque_FinalizeRequest_core(const uint8_t *sec/*[OPAQUE_REGISTER_USER_SEC_LE
    for parameters see opaque_FinalizeRequest() description.
  */
 int opaque_FinalizeRequest(const uint8_t *sec/*[OPAQUE_REGISTER_USER_SEC_LEN+pwdU_len]*/,
-                           const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN],
+                           const uint8_t *pub,
                            const Opaque_Ids *ids,
-                           uint8_t reg_rec[OPAQUE_REGISTRATION_RECORD_LEN],
+                           uint8_t *reg_rec,
                            uint8_t export_key[crypto_hash_sha512_BYTES]);
 
 /**
@@ -541,9 +541,9 @@ int opaque_FinalizeRequest(const uint8_t *sec/*[OPAQUE_REGISTER_USER_SEC_LEN+pwd
    opaque_FinalizeRequest()
    @param [out] rec - the final record to be stored by the server.
  */
-void opaque_StoreUserRecord(const uint8_t sec[OPAQUE_REGISTER_SECRET_LEN],
-                            const uint8_t recU[OPAQUE_REGISTRATION_RECORD_LEN],
-                            uint8_t rec[OPAQUE_USER_RECORD_LEN]);
+void opaque_StoreUserRecord(const uint8_t *sec,
+                            const uint8_t *recU,
+                            uint8_t *rec);
 #ifdef __cplusplus
 }
 #endif
