@@ -1,7 +1,7 @@
 #include "common.h"
 
 #if (defined TRACE || defined CFRG_TEST_VEC)
-void dump(const uint8_t *p, const size_t len, const char* msg, ...) {
+void __attribute__((visibility("hidden")))  dump(const uint8_t *p, const size_t len, const char* msg, ...) {
   va_list args;
   va_start(args, msg);
   vfprintf(stderr,msg, args);
