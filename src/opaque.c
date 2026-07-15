@@ -130,7 +130,7 @@ static int voprf_hash_to_scalar(const uint8_t *msg, const uint8_t msg_len, const
   if(0!=sodium_mlock(uniform_bytes,sizeof uniform_bytes)) {
     return -1;
   }
-  if(0!=expand_message_xmd(msg, msg_len, dst, dst_len, crypto_core_ristretto255_HASHBYTES, uniform_bytes)) {
+  if(0!=oprf_expand_message_xmd(msg, msg_len, dst, dst_len, crypto_core_ristretto255_HASHBYTES, uniform_bytes)) {
     sodium_munlock(uniform_bytes,sizeof uniform_bytes);
     return -1;
   }
